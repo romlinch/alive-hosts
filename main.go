@@ -2,9 +2,10 @@ package main
 
 import (
 	"net"
-	"os/exec"
+
 	"fmt"
 	"os"
+	"time"
 )
 
 func Hosts(cidr string) ([]string, error) {
@@ -38,14 +39,17 @@ type Pong struct {
 
 func ping(pingChan <-chan string, pongChan chan<- Pong) {
 	for ip := range pingChan {
-		_, err := exec.Command("ping", "-c1", "-w1", ip).Output()
-		var alive bool
+		docker := ip + ":2375"
+		conn, err := net.DialTimeout("tcp", docker, time.Second)
+		//_, err := exec.Command("ping", "-c1", "-w1", ip).Output()
 		if err != nil {
-			alive = false
+			pongChan <- Pong{Ip: ip, Alive: false}
 		} else {
-			alive = true
+			conn.Close()
+			pongChan <- Pong{Ip: ip, Alive: true}
 		}
-		pongChan <- Pong{Ip: ip, Alive: alive}
+
+
 	}
 }
 
@@ -83,7 +87,9 @@ func main() {
 	alives := <-doneChan
 
 	for _, alive := range alives {
-		fmt.Println(alive.Ip)
+		if(alive.Alive) {
+			fmt.Println(alive.Ip)
+		}
 	}
 
 }
